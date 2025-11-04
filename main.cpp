@@ -11,9 +11,16 @@
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
 
+struct Box {
+    SDL_Rect r;
+    int speed;
+    SDL_Color col;
+};
+
+const int NUM_STRIPS = 5;
+
 int main() {
     SDL_Window* window = nullptr;
-    SDL_Renderer* renderer = nullptr;
 
     // Error codes in case something does not render
 
@@ -39,10 +46,55 @@ int main() {
         return 1;
     }
 
+    SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED | SDL_RENDERER_PRESENTVSYNC);
+    if (!renderer) {
+        std::printf("Renderer create error: %s\n", SDL_GetError());
+        SDL_DestroyWindow(window);
+        TTF_Quit(); IMG_Quit(); SDL_Quit(); return 1;
+    }
+
+    // Variables for the boxes 
+
+    int stripH = SCREEN_HEIGHT / NUM_STRIPS;
+    int colW = SCREEN_WIDTH / 6;
+    int leftX = 0;
+    int rightX = SCREEN_WIDTH - colW;
+
+    // Makes the boxes go from light to dark
+
+    SDL_Color shades[NUM_STRIPS] = {
+        {255,255,255,255},
+        {210,210,210,210},
+        {160,160,160,160},
+        {110,110,110,110},
+        {60,60,60,255}
+    };
+
+    // Making two columns 5 boxes each
+    Box leftCol[NUM_STRIPS];
+    Box rightCol[NUM_STRIPS];
+
+    for (int i = 0; i < NUM_STRIPS; i++) {
+        int y = SCREEN_HEIGHT - (i+1)*stripH;
+
+        leftCol[i].r = { leftX, y, colW, stripH};
+        rightCol[i].r = { rightX, y, colW, stripH};
+
+        leftCol[i].col = shades[i];
+        rightCol[i].col = shades[i];
+
+        // Giving them slightly different speeds so that they drift
+        int base = 90;
+        leftCol[i].speed = base + i*6;
+        rightCol[i].speed = base + i*6;
+    }
 
     int bgX = 0;
     bool running = true;
     SDL_Event e;
+
+    // Initializes the dt clock once
+    static Uint32 prev = SDL_GetTicks();
 
     while (running) {
         while (SDL_PollEvent(&e)) {
@@ -52,8 +104,28 @@ int main() {
             if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
                 running = false;
             }
-
         }
+
+            Uint32 now = SDL_GetTicks();
+            float dt = (now - prev) / 1000.0f;
+            prev = now;
+
+            // Background of the game
+            SDL_SetRenderDrawColor(renderer, 12, 14, 20, 255);
+            SDL_RenderClear(renderer);
+
+            // Drawing the left and right columns
+            auto drawColumn = [&](Box boxes[NUM_STRIPS]){
+                for (int i = 0; i < NUM_STRIPS; i++) {
+                    SDL_SetRenderDrawColor(renderer, boxes[i].col.r, boxes[i].col.g, boxes[i].col.b, 255);
+                    SDL_RenderFillRect(renderer, &boxes[i].r);
+                }
+            };
+
+            drawColumn(leftCol);
+            drawColumn(rightCol);
+
+            SDL_RenderPresent(renderer);
     }
 
         SDL_DestroyRenderer(renderer);
