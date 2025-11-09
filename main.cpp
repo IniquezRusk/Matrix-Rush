@@ -1,4 +1,4 @@
-// g++ main.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
+// g++ main.cpp player.cpp enemy.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
 
 
 #define SDL_MAIN_HANDLED
@@ -7,6 +7,8 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <vector>
+#include "player.h"
+#include "enemy.h"
 
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
@@ -55,7 +57,7 @@ int main() {
 
     // Variables for the boxes 
 
-    int stripH = SCREEN_HEIGHT / NUM_STRIPS;
+    int stripH = SCREEN_HEIGHT / 5;
     int colW = SCREEN_WIDTH / 6;
     int leftX = 0;
     int rightX = SCREEN_WIDTH - colW;
@@ -89,6 +91,23 @@ int main() {
         rightCol[i].speed = base + i*6;
     }
 
+    // Initializing the player and enemy squares
+    Player player;
+    Enemy enemy;
+
+    int squareW = colW * 0.6;
+    int squareH = 70;
+
+    // Centering the horizontally in the column
+    int marginX = (colW - squareW) / 2;
+
+    // Bottom positon (lowest strip)
+    int bottomY = SCREEN_HEIGHT - stripH + (stripH - squareH) / 2;
+
+    // Initializeing x, y, w, h, and step
+    player.init(leftX + marginX, bottomY, squareW, squareH, stripH);
+    enemy.init(rightX + marginX, bottomY, squareW, squareH, stripH);
+
     int bgX = 0;
     bool running = true;
     SDL_Event e;
@@ -110,7 +129,7 @@ int main() {
             float dt = (now - prev) / 1000.0f;
             prev = now;
 
-            // Background of the game
+            // Background 
             SDL_SetRenderDrawColor(renderer, 12, 14, 20, 255);
             SDL_RenderClear(renderer);
 
@@ -124,6 +143,10 @@ int main() {
 
             drawColumn(leftCol);
             drawColumn(rightCol);
+
+            // Rendering the player and enemy
+            player.render(renderer);
+            enemy.render(renderer);
 
             SDL_RenderPresent(renderer);
     }
