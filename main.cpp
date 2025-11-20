@@ -1,4 +1,4 @@
-// g++ main.cpp player.cpp enemy.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
+// g++ main.cpp player.cpp enemy.cpp displayProblem.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
 
 
 #define SDL_MAIN_HANDLED
@@ -9,6 +9,7 @@
 #include <vector>
 #include "player.h"
 #include "enemy.h"
+#include "displayProblem.h"
 
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
@@ -54,6 +55,13 @@ int main() {
         SDL_DestroyWindow(window);
         TTF_Quit(); IMG_Quit(); SDL_Quit(); return 1;
     }
+
+    TTF_Font* font = TTF_OpenFont("assets/yourfont.ttf", 24);
+    if (!font) {
+    std::cout << "Failed to load font! TTF_Error: " << TTF_GetError() << "\n";
+    return 1;
+}
+
 
     // Variables for the boxes 
 
@@ -115,41 +123,93 @@ int main() {
     // Initializes the dt clock once
     static Uint32 prev = SDL_GetTicks();
 
-    while (running) {
-        while (SDL_PollEvent(&e)) {
-            if (e.type == SDL_QUIT) {
-                running = false;
-            }
-            if (e.type == SDL_KEYDOWN && e.key.keysym.sym == SDLK_ESCAPE) {
-                running = false;
+    // Generates a matrix problem
+    MatrixQuestion q;
+    generateSystem(q, 3);
+
+    // Used for text to font inputs
+    std::string userInput[3] = {"", "", ""};
+    int activeInput = 0;
+
+    auto drawColumn = [&](Box boxes[NUM_STRIPS]) {
+        for (int i = 0; i < NUM_STRIPS; i++) {
+            SDL_SetRenderDrawColor(renderer, boxes[i].col.r, boxes[i].col.g, boxes[i].col.b, 255);
+            SDL_RenderFillRect(renderer, &boxes[i].r);
+        }
+    };
+
+SDL_StartTextInput();
+while (running) {
+    SDL_Event e;
+    while (SDL_PollEvent(&e)) {
+        if (e.type == SDL_QUIT) 
+        running = false;
+        else if (e.type == SDL_KEYDOWN) {
+            switch (e.key.keysym.sym) {
+                case SDLK_ESCAPE:
+                    running = false;
+                    break;
+                case SDLK_TAB:
+                    activeInput = (activeInput + 1) % 3;
+                    break;
+                case SDLK_BACKSPACE:
+                    if (!userInput[activeInput].empty())
+                        userInput[activeInput].pop_back(); 
+                    break;
+                case SDLK_RETURN:
+                    try {
+                        double x = std::stod(userInput[0]);
+                        double y = std::stod(userInput[1]);
+                        double z = std::stod(userInput[2]);
+
+                        if (checkAnswer(q, x, y, z))
+                            std::cout << "Correct!\n";
+                        else 
+                            std::cout << "Incorrect!\n";
+                     } catch (std::invalid_argument&) {
+                        std::cout << "Please enter a valid number for all inputs!\n";
+                    } catch (std::out_of_range&) {
+                        std::cout << "Input number is too large!\n";
+                    }
+                    break;
             }
         }
-
-            Uint32 now = SDL_GetTicks();
-            float dt = (now - prev) / 1000.0f;
-            prev = now;
-
-            // Background 
-            SDL_SetRenderDrawColor(renderer, 12, 14, 20, 255);
-            SDL_RenderClear(renderer);
-
-            // Drawing the left and right columns
-            auto drawColumn = [&](Box boxes[NUM_STRIPS]){
-                for (int i = 0; i < NUM_STRIPS; i++) {
-                    SDL_SetRenderDrawColor(renderer, boxes[i].col.r, boxes[i].col.g, boxes[i].col.b, 255);
-                    SDL_RenderFillRect(renderer, &boxes[i].r);
-                }
-            };
-
-            drawColumn(leftCol);
-            drawColumn(rightCol);
-
-            // Rendering the player and enemy
-            player.render(renderer);
-            enemy.render(renderer);
-
-            SDL_RenderPresent(renderer);
+        else if (e.type == SDL_TEXTINPUT) {
+            userInput[activeInput] += e.text.text;
+        }
     }
+
+
+    // Render
+    SDL_SetRenderDrawColor(renderer, 12, 14, 20, 255);
+    SDL_RenderClear(renderer);
+
+    // Columns, player, enemy, etc.
+    drawColumn(leftCol);
+    drawColumn(rightCol);
+    player.render(renderer);
+    enemy.render(renderer);
+
+    SDL_Color White = {255,255,255,255};
+
+    // Draw matrix equations
+    renderMatrixQuestion(renderer, font, q, White);
+
+    // Draw solution lines
+    int spacing = 60;
+    int startX = SCREEN_WIDTH / 2;
+    int startY = (SCREEN_HEIGHT - 3 * spacing)/2 + q.size*50; // below equations
+    std::string labels[3] = {"x = ", "y = ", "z = "};
+    for (int i = 0; i < 3; i++) {
+        int textW, textH;
+        TTF_SizeText(font, labels[i].c_str(), &textW, &textH);
+        renderText(renderer, font, labels[i] + userInput[i], startX - textW/2, startY + i*spacing, White);
+    }
+
+    SDL_RenderPresent(renderer);
+}
+SDL_StopTextInput();
+
 
         SDL_DestroyRenderer(renderer);
         SDL_DestroyWindow(window);
