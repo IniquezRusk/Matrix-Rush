@@ -10,3 +10,12 @@ If you however:
 Your player square will stay stagnant, but the AI opponent will move up.
 
 This game is intended to help you complete matrix equations in a fun manner against the AI. Make sure you are checking your work before proceeding.
+
+**/ HOW TO PLAY /**
+
+You are dropped into the game. Press enter to get into the game.
+You'll be given a random matrix equation that you need to solve.
+In order for your answer to be counted, ALL THREE FIELDS must have an answer on it.
+Press enter once all three fields are on.
+
+It will give you the correct answer if you are wrong, as well as a cooldown and animation of your player (or the AI) moving up based on the coniditons of what you entered.
