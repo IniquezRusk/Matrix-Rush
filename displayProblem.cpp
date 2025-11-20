@@ -1,14 +1,10 @@
+#include "displayProblem.h"
 #include <iostream>
-#include <cstdlib>
 #include <ctime>
 #include <cmath>
 
-struct MatrixQuestion {
-    int size;          // 2 or 3
-    int A[3][3];       // coefficients
-    int B[3];          // constants
-    double solution[3];// internally solved
-};
+int SCREEN_WIDTH = 1280;
+int SCREEN_HEIGHT = 720;
 
 // Solve system using Gaussian elimination
 bool solve(MatrixQuestion& q) {
@@ -100,6 +96,56 @@ void multiply(const int A[4][4], const int B[4][4], int C[4][4], int n) {
         }
     }
 }
+
+// SDL2 Rendering
+void renderText(SDL_Renderer* renderer, TTF_Font* font, const std::string& text, int x, int y, SDL_Color color) {
+    SDL_Surface* surface = TTF_RenderText_Solid(font, text.c_str(), color);
+    SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+    SDL_Rect dst = {x, y, surface->w, surface->h};
+    SDL_RenderCopy(renderer, texture, nullptr, &dst);
+    SDL_FreeSurface(surface);
+    SDL_DestroyTexture(texture);
+}
+
+void renderMatrixQuestion(SDL_Renderer* renderer, TTF_Font* font, const MatrixQuestion& q, SDL_Color color) {
+    int spacing = 50;
+    int totalHeight = q.size * spacing;
+    int startY = (SCREEN_HEIGHT - totalHeight - 3*spacing) / 2;
+    int startX = SCREEN_WIDTH / 2;
+
+    // First, calculate width and height of each line
+    for (int i = 0; i < q.size; i++) {
+        std::string line;
+        for (int j = 0; j < q.size; j++) {
+            line += std::to_string(q.A[i][j]) + (j==0?"x":j==1?"y":"z");
+            if (j < q.size-1) line += " + ";
+        }
+        line += " = " + std::to_string(q.B[i]);
+
+        int textW, textH;
+        TTF_SizeText(font, line.c_str(), &textW, &textH);
+
+        renderText(renderer, font, line, startX - textW/2, startY + i * spacing, color);
+     
+    }
+}
+
+void renderSolutionLines(SDL_Renderer* renderer, TTF_Font* font, SDL_Color color) {
+    int spacing = 60;
+    int totalHeight = 3* spacing;
+    int startY = (SCREEN_HEIGHT - totalHeight) / 2;
+    int startX = SCREEN_WIDTH / 2;
+
+    std::string labels[3] = {"x = ", "y = ", "z = "};
+
+    for (int i = 0; i < 3; i++) {
+        int textW, textH;
+        TTF_SizeText(font, labels[i].c_str(), &textW, &textH); 
+
+        renderText(renderer, font, labels[i], startX - textW/2, startY + i * spacing, color);
+    }
+}
+
 
 int main() {
     std::srand(std::time(0));
