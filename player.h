@@ -1,42 +1,57 @@
-/* The purpose of this file is for the player. It has 3 variables, running out of time,
-answeing correctly, and answering incorrectly. If they are correct, they move up.
-If they run out of time or answers incorrectly, they stay, and the enemy moves up*/
-
 #ifndef PLAYER_H
 #define PLAYER_H
 
 #include <SDL2/SDL.h>
 
 class Player {
-    public:
-        Player();
+public:
+    Player();
 
-        void markCorrect();
-        void markIncorrect();
-        void markTimeOut();
+    void init(int x, int y, int w, int h, int moveStep);
 
-        // Movement
-        void moveUp();
-        void resetPos();
+    void markCorrect();
+    void markIncorrect();
+    void markTimeOut();
 
-        // Renderer
-        void render(SDL_Renderer* renderer);
+    // instant move (legacy)
+    void moveUp();
 
-        // Getter functions
-        int getPosX();
-        int getPosY();
+    // start smooth move up by N cells over durationSeconds (non-blocking)
+    void startMoveUp(int cells = 1, float durationSeconds = 0.35f);
 
-        // Setting the starting position and size
-        void init(int x, int y, int w, int h, int moveStep);
+    // advance animation by dt seconds
+    void update(float dt);
 
-    private:
-        SDL_Rect rect;
-        int step;
+    void resetPos();
 
-        bool ranOutOfTime;
-        bool isCorrect;
-        bool isIncorrect;
+    int getPosX();
+    int getPosY();
+
+    void render(SDL_Renderer* renderer);
+
+private:
+    SDL_Rect rect;
+    int step;
+
+    bool ranOutOfTime;
+    bool isCorrect;
+    bool isIncorrect;
+
+    // animation state
+    bool animating;
+    int animCells;
+    float animDuration;
+    float animElapsed;
+    int animStartY;
+    int animEndY;
+
+    // add this
+    int startY;
+
+    static float easeOutCubic(float t);
+
 };
 
 #endif
+
 
