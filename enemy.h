@@ -11,6 +11,8 @@ class Enemy {
         Enemy();
         void init(int x, int y, int w, int h, int moveSquare);
         void moveUp();
+        void startMoveUp(int cells = 1, float durationSections = 0.35f);
+        void update(float dt);
         void resetPos();
 
         void render(SDL_Renderer* renderer);
@@ -20,6 +22,17 @@ class Enemy {
     private:
         SDL_Rect rect;
         int step;
+
+        bool animating;
+        int animCells;
+        float animDuration;
+        float animElapsed;
+        int animStartY;
+        int animEndY;
+
+        int startY;
+
+        static float easeOutCubic(float t);
 };
 
 #endif
