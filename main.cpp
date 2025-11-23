@@ -1,4 +1,4 @@
-// g++ main.cpp player.cpp enemy.cpp displayProblem.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
+// g++ main.cpp player.cpp enemy.cpp displayProblem.cpp feedback.cpp -Ix86_64-w64-mingw32/include -Lx86_64-w64-mingw32/lib -lmingw32 -lSDL2main -lSDL2 -lSDL2_image -lSDL2_ttf -o main.exe
 
 
 #define SDL_MAIN_HANDLED
@@ -7,12 +7,22 @@
 #include <SDL2/SDL_image.h>
 #include <SDL2/SDL_ttf.h>
 #include <vector>
+#include <cmath>
+#include <ctime>
 #include "player.h"
 #include "enemy.h"
+#include "feedback.h"
 #include "displayProblem.h"
 
 const int SCREEN_WIDTH = 1280;
 const int SCREEN_HEIGHT = 720;
+
+enum GameState {
+    TITLE,
+    PLAYING,
+    PAUSED,
+    GAME_OVER
+};
 
 struct Box {
     SDL_Rect r;
@@ -24,6 +34,10 @@ const int NUM_STRIPS = 5;
 
 int main() {
     SDL_Window* window = nullptr;
+    std::string winner = "";
+
+    // Seeds the random number generator so the questions are always completely random
+    std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
     // Error codes in case something does not render
 
@@ -62,6 +76,9 @@ int main() {
     return 1;
 }
 
+    // Winning conditions
+    int correctCount = 0;
+    int incorrectCount = 0;
 
     // Variables for the boxes 
 
@@ -127,9 +144,16 @@ int main() {
     MatrixQuestion q;
     generateSystem(q, 3);
 
+    // Timer for the game
+    const float TIME_LIMIT = 180.0f;
+    float timeLeft = TIME_LIMIT;
+
     // Used for text to font inputs
     std::string userInput[3] = {"", "", ""};
     int activeInput = 0;
+
+    // Generating the feedback object
+    Feedback feedback;
 
     auto drawColumn = [&](Box boxes[NUM_STRIPS]) {
         for (int i = 0; i < NUM_STRIPS; i++) {
@@ -138,84 +162,298 @@ int main() {
         }
     };
 
+    GameState state = TITLE;
+
 SDL_StartTextInput();
+
 while (running) {
     SDL_Event e;
     while (SDL_PollEvent(&e)) {
-        if (e.type == SDL_QUIT) 
-        running = false;
-        else if (e.type == SDL_KEYDOWN) {
+        if (e.type == SDL_QUIT) {
+            running = false;
+        }
+
+        // Start the game from title
+        else if (state == TITLE && e.type == SDL_KEYDOWN) {
+            state = PLAYING;
+        }
+
+        // Only handle gameplay input if actually playing
+        else if (state == PLAYING && e.type == SDL_KEYDOWN) {
             switch (e.key.keysym.sym) {
                 case SDLK_ESCAPE:
                     running = false;
                     break;
+
                 case SDLK_TAB:
                     activeInput = (activeInput + 1) % 3;
                     break;
+
                 case SDLK_BACKSPACE:
                     if (!userInput[activeInput].empty())
                         userInput[activeInput].pop_back(); 
                     break;
+
                 case SDLK_RETURN:
                     try {
                         double x = std::stod(userInput[0]);
                         double y = std::stod(userInput[1]);
                         double z = std::stod(userInput[2]);
 
-                        if (checkAnswer(q, x, y, z))
-                            std::cout << "Correct!\n";
-                        else 
-                            std::cout << "Incorrect!\n";
-                     } catch (std::invalid_argument&) {
-                        std::cout << "Please enter a valid number for all inputs!\n";
-                    } catch (std::out_of_range&) {
-                        std::cout << "Input number is too large!\n";
+                        if (checkAnswer(q, x, y, z)) {
+                            feedback.showCorrect();
+                            player.markCorrect();
+                            player.startMoveUp(1, 0.5f);
+
+                            correctCount++;
+                        } else { 
+                            feedback.showIncorrect();
+                            player.markIncorrect();
+                            enemy.startMoveUp(1, 0.5f);
+
+                            incorrectCount++;
+                        }
+
+                        if (correctCount >= 5) {
+                            winner = "PLAYER";
+                            state = GAME_OVER;
+                        }
+
+                        if (incorrectCount >= 5) {
+                            winner = "ENEMY";
+                            state = GAME_OVER;
+                        }
+
+                        if (state == PLAYING) {
+                        userInput[0].clear();
+                        userInput[1].clear();
+                        userInput[2].clear();
+                        generateSystem(q, 3);
+                        timeLeft = TIME_LIMIT;
+                        }
+
+                    } catch (...) {
+                        std::cout << "Invalid number\n";
                     }
                     break;
             }
         }
-        else if (e.type == SDL_TEXTINPUT) {
+
+        else if (state == GAME_OVER && e.type == SDL_KEYDOWN) {
+            // Resets the win counters
+            correctCount = 0;
+            incorrectCount = 0;
+            winner = "";
+
+            // Resets the enemy/player positions
+            player.resetPos();
+            enemy.resetPos();
+
+            // Resets the input boxes
+            userInput[0].clear();
+            userInput[1].clear();
+            userInput[2].clear();
+
+            // Resets the timer
+            timeLeft = TIME_LIMIT;
+
+            // Generate new matrix problem
+            generateSystem(q, 3);
+
+            // Back to gameplay
+            state = PLAYING;
+        }
+
+        
+
+        // Only accept typing when PLAYING
+        else if (state == PLAYING && e.type == SDL_TEXTINPUT) {
             userInput[activeInput] += e.text.text;
         }
     }
 
-
-    // Render
+    // CLEAR SCREEN
     SDL_SetRenderDrawColor(renderer, 12, 14, 20, 255);
     SDL_RenderClear(renderer);
 
-    // Columns, player, enemy, etc.
+
+   if (state == TITLE) {
+
+    SDL_SetRenderDrawColor(renderer, 0, 0, 20, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_Color green = {0,255,0};
+
+    // ----- TITLE TEXT -----
+    SDL_Surface* titleSurface = TTF_RenderText_Solid(font, "[MATRIX RUSH]", green);
+    SDL_Texture* titleTex = SDL_CreateTextureFromSurface(renderer, titleSurface);
+
+    SDL_Rect titleRect = {
+        SCREEN_WIDTH / 2 - titleSurface->w / 2,
+        150,
+        titleSurface->w,
+        titleSurface->h
+    };
+
+    SDL_RenderCopy(renderer, titleTex, NULL, &titleRect);
+    SDL_FreeSurface(titleSurface);
+    SDL_DestroyTexture(titleTex);
+
+    // ----- PRESS ANY KEY -----
+    if ((SDL_GetTicks() / 500) % 2 == 0) {
+        SDL_Surface* msgSurf = TTF_RenderText_Solid(font, "PRESS ANY KEY TO START", green);
+        SDL_Texture* msgTex = SDL_CreateTextureFromSurface(renderer, msgSurf);
+
+        SDL_Rect msgRect = {
+            SCREEN_WIDTH / 2 - msgSurf->w / 2,
+            SCREEN_HEIGHT - 120,
+            msgSurf->w,
+            msgSurf->h
+        };
+
+        SDL_RenderCopy(renderer, msgTex, NULL, &msgRect);
+        SDL_FreeSurface(msgSurf);
+        SDL_DestroyTexture(msgTex);
+    }
+
+    SDL_RenderPresent(renderer);
+    continue;
+}
+
+   if (state == GAME_OVER) {
+    SDL_SetRenderDrawColor(renderer, 0, 0, 20, 255);
+    SDL_RenderClear(renderer);
+
+    SDL_Color red   = {255, 0, 0};
+    SDL_Color green = {0, 255, 0};
+
+    // GAME OVER
+    SDL_Surface* goSurf = TTF_RenderText_Solid(font, "[GAME OVER]", red);
+    SDL_Texture* goTex = SDL_CreateTextureFromSurface(renderer, goSurf);
+
+    SDL_Rect goRect = {
+        SCREEN_WIDTH/2 - goSurf->w/2,
+        SCREEN_HEIGHT/2 - 50,
+        goSurf->w,
+        goSurf->h
+    };
+
+    SDL_RenderCopy(renderer, goTex, NULL, &goRect);
+    SDL_FreeSurface(goSurf);
+    SDL_DestroyTexture(goTex);
+
+    // WIN/LOSE message 
+    SDL_Surface* resultSurf = nullptr;
+    SDL_Texture* resultTex = nullptr;
+
+    if (winner == "PLAYER") {
+        resultSurf = TTF_RenderText_Solid(font, "[YOU WIN]", green);
+    } else {
+        resultSurf = TTF_RenderText_Solid(font, "[YOU LOSE]", red);
+    }
+
+    // Blinking press R to restart
+    if ((SDL_GetTicks() / 500) % 2 == 0) {
+        SDL_Color white = {255, 255, 255};
+
+        SDL_Surface* restartSurf = TTF_RenderText_Solid(font, "Press R to Restart", white);
+        SDL_Texture* restartTex = SDL_CreateTextureFromSurface(renderer, restartSurf);
+
+        SDL_Rect restartRect = {
+            SCREEN_WIDTH/2 - restartSurf->w/2,
+            SCREEN_HEIGHT/2 + 90,
+            restartSurf->w,
+            restartSurf->h
+        };
+
+        SDL_RenderCopy(renderer, restartTex, NULL, &restartRect);
+
+        SDL_FreeSurface(restartSurf);
+        SDL_DestroyTexture(restartTex);
+    }
+
+    resultTex = SDL_CreateTextureFromSurface(renderer, resultSurf);
+
+    SDL_Rect resRect = {
+        SCREEN_WIDTH/2 - resultSurf->w/2,
+        SCREEN_HEIGHT/2 + 20,
+        resultSurf->w,
+        resultSurf->h
+    };
+
+    SDL_RenderCopy(renderer, resultTex, NULL, &resRect);
+
+    SDL_FreeSurface(resultSurf);
+    SDL_DestroyTexture(resultTex);
+
+    SDL_RenderPresent(renderer);
+    continue;
+}
+
+    Uint32 now = SDL_GetTicks();
+    float dt = (now - prev) / 1000.0f;
+    if (dt > 0.1f) dt = 0.1f;
+    prev = now;
+
+    player.update(dt);
+    enemy.update(dt);
+    feedback.update(dt);
+
+    timeLeft -= dt;
+    if (timeLeft <= 0.0f) {
+        player.markTimeOut();
+        enemy.startMoveUp(1, 0.5f);
+        userInput[0].clear();
+        userInput[1].clear();
+        userInput[2].clear();
+        generateSystem(q, 3);
+        timeLeft = TIME_LIMIT;
+    }
+
+    // Timer
+    int seconds = std::ceil(timeLeft);
+    if (seconds < 0) seconds = 0;
+
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%02d:%02d", seconds/60, seconds%60);
+    std::string timeStr = buf;
+
+    int textW, textH;
+    TTF_SizeText(font, timeStr.c_str(), &textW, &textH);
+
+    renderText(renderer, font, timeStr,
+               SCREEN_WIDTH/2 - textW/2, 20,
+               {255,255,255,255});
+
+    // Columns, player, enemy
     drawColumn(leftCol);
     drawColumn(rightCol);
     player.render(renderer);
     enemy.render(renderer);
 
-    SDL_Color White = {255,255,255,255};
+    // Matrix problem
+    renderMatrixQuestion(renderer, font, q, {255,255,255,255});
 
-    // Draw matrix equations
-    renderMatrixQuestion(renderer, font, q, White);
-
-    // Draw solution lines
+    // Input boxes
     int spacing = 60;
     int startX = SCREEN_WIDTH / 2;
-    int startY = (SCREEN_HEIGHT - 3 * spacing)/2 + q.size*50; // below equations
+    int startY = (SCREEN_HEIGHT - 3*spacing)/2 + q.size*50;
+
     std::string labels[3] = {"x = ", "y = ", "z = "};
     for (int i = 0; i < 3; i++) {
-        int textW, textH;
         TTF_SizeText(font, labels[i].c_str(), &textW, &textH);
-        renderText(renderer, font, labels[i] + userInput[i], startX - textW/2, startY + i*spacing, White);
+        renderText(renderer, font,
+                   labels[i] + userInput[i],
+                   startX - textW/2,
+                   startY + i*spacing,
+                   {255,255,255,255});
     }
 
+    feedback.render(renderer, font, q);
+
     SDL_RenderPresent(renderer);
+    SDL_Delay(16);
 }
+
 SDL_StopTextInput();
-
-
-        SDL_DestroyRenderer(renderer);
-        SDL_DestroyWindow(window);
-        TTF_Quit();
-        IMG_Quit();
-        SDL_Quit();
-
-        return 0;
 }
