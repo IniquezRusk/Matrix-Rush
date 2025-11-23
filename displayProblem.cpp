@@ -47,26 +47,41 @@ bool solve(MatrixQuestion& q) {
     return true;
 }
 
+
+int determinant3x3(int A[3][3]) {
+    return A[0][0]*(A[1][1]*A[2][2] - A[1][2]*A[2][1])
+         - A[0][1]*(A[1][0]*A[2][2] - A[1][2]*A[2][0])
+         + A[0][2]*(A[1][0]*A[2][1] - A[1][1]*A[2][0]);
+}
+
 void generateSystem(MatrixQuestion& q, int n) {
     q.size = n;
     int x = std::rand() % 10 + 1;
     int y = std::rand() % 10 + 1;
     int z = std::rand() % 10 + 1;
 
-    for(int i=0;i<n;i++){
-        for(int j=0;j<n;j++){
-            q.A[i][j] = std::rand()%10 + 1;
-        }
-    }
+    int det = 0;
+    do {
+        for (int i = 0; i < n; i++) {
+            q.A[i][0] = std::rand()%10 + 1;
+            q.A[i][1] = std::rand()%10 + 1;
+            q.A[i][2] = std::rand()%10 + 1;
 
-    for(int i=0;i<n;i++){
-        q.B[i] = q.A[i][0]*x + q.A[i][1]*y + q.A[i][2]*z;
-    }
+            q.B[i] = q.A[i][0]*x + q.A[i][1]*y + q.A[i][2]*z;
+        }
+        int A3x3[3][3] = { 
+            { q.A[0][0], q.A[0][1], q.A[0][2] },
+            { q.A[1][0], q.A[1][1], q.A[1][2] },
+            { q.A[2][0], q.A[2][1], q.A[2][2] } 
+        };
+        det = determinant3x3(A3x3);
+    } while (det == 0); // regenerate if determinant is 0
 
     q.solution[0] = x;
     q.solution[1] = y;
     q.solution[2] = z;
 }
+
 
 void printSystem(const MatrixQuestion& q) {
     int n = q.size;
@@ -80,7 +95,7 @@ void printSystem(const MatrixQuestion& q) {
 }
 
 bool checkAnswer(MatrixQuestion& q, double userX, double userY, double userZ){
-    const double eps = 1e-6;
+    const double eps = 0.01;
     return (std::abs(userX - q.solution[0]) < eps &&
             std::abs(userY - q.solution[1]) < eps &&
             std::abs(userZ - q.solution[2]) < eps);
