@@ -18,4 +18,8 @@ You'll be given a random matrix equation that you need to solve.
 In order for your answer to be counted, ALL THREE FIELDS must have an answer on it.
 Press enter once all three fields are on.
 
+Press tab to scroll between x, y, and z.
+There are no indicators on the screen, you will need to enter a value based on where you are at.
+You have 3 minutes to solve each question.
+
 It will give you the correct answer if you are wrong, as well as a cooldown and animation of your player (or the AI) moving up based on the coniditons of what you entered.
