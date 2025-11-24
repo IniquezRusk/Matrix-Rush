@@ -106,3 +106,4 @@ float Player::easeOutCubic(float t) {
     float p = 1.0f - t;
     return 1.0f - p*p*p;
 }
+
