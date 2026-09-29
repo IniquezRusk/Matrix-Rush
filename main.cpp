@@ -523,8 +523,24 @@ if (bgTexture && state == PLAYING) {
     SDL_Quit();
 
     return 0;
+
+ SDL_StopTextInput();
+
+    // cleanup bgTexture once at shutdown
+    if (bgTexture) {
+        SDL_DestroyTexture(bgTexture);
+        bgTexture = nullptr;
+    }
+
+    // cleanup SDL stuff
+    if (font) TTF_CloseFont(font);
+    if (renderer) SDL_DestroyRenderer(renderer);
+    if (window) SDL_DestroyWindow(window);
+    TTF_Quit();
+    IMG_Quit();
+    SDL_Quit();
+
+    return 0;
 }
 
-SDL_StopTextInput();
-}
 
